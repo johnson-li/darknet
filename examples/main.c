@@ -58,21 +58,17 @@ int run_one_time(network *net, float thresh, float hier_thresh, image **alphabet
     } else {
         printf("Could not open file\n");
     }
-
     yuv2rgb(yuv);
 
-//    image im = load_image_color(input,0,0);
-    float rgb_float[RGB_SIZE];
-
+    image im = make_image(WIDTH, HEIGHT, CHANNEL);
     for (int j = 0; j < HEIGHT; j++) {
         for (int k = 0; k < WIDTH; k++) {
             for (int i = 0; i < CHANNEL; i++) {
-                rgb_float[k + WIDTH*j + HEIGHT*WIDTH*i] = (float)rgb_rgb[i + CHANNEL*k + CHANNEL*WIDTH*j] / 255;
+                im.data[k + WIDTH*j + HEIGHT*WIDTH*i] = (float)rgb_rgb[i + CHANNEL*k + CHANNEL*WIDTH*j] / 255;
             }
         }
     }
 
-    image im = {WIDTH, HEIGHT, CHANNEL, rgb_float};
     printf("123123\n");
     image sized = letterbox_image(im, net->w, net->h);
     layer l = net->layers[net->n-1];
@@ -88,7 +84,10 @@ int run_one_time(network *net, float thresh, float hier_thresh, image **alphabet
     draw_detections(im, dets, nboxes, thresh, names, alphabet, l.classes);
     free_detections(dets, nboxes);
     if(outfile){
+        printf("write to: %s\n", outfile);
         save_image(im, outfile);
+    } else {
+        printf("no output file specified\n");
     }
     return 1;
 }
