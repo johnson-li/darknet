@@ -23,14 +23,20 @@ __uint8_t rgb_rgb[RGB_SIZE];
 __uint8_t rgb_r[HEIGHT * WIDTH];
 __uint8_t rgb_g[HEIGHT * WIDTH];
 __uint8_t rgb_b[HEIGHT * WIDTH];
+char last_path[100];
+char latest[80];
+char path[100];
+char outfile[120];
 
 void yuv2rgb(__uint8_t* yuv) {
     AVFrame *frame = av_frame_alloc();
-    av_image_fill_arrays(frame->data, frame->linesize, yuv, AV_PIX_FMT_YUV420P, WIDTH, HEIGHT, 1);
     struct SwsContext *sws_ctx = sws_getContext(WIDTH, HEIGHT, AV_PIX_FMT_YUV420P, WIDTH, HEIGHT, AV_PIX_FMT_RGB24, SWS_BILINEAR, NULL, NULL, NULL);
+    av_image_fill_arrays(frame->data, frame->linesize, yuv, AV_PIX_FMT_YUV420P, WIDTH, HEIGHT, 1);
     int stride[1] = {3 * WIDTH};
     uint8_t *rgb24[] = {rgb_rgb};
     sws_scale(sws_ctx, (const uint8_t * const *)frame->data, frame->linesize, 0, HEIGHT, rgb24, stride);
+    sws_freeContext(sws_ctx);
+    av_frame_free(&frame);
     for (int i = 0; i < HEIGHT * WIDTH; i++) {
         rgb_r[i] = rgb_rgb[i * 3 + 0];
         rgb_g[i] = rgb_rgb[i * 3 + 1];
@@ -38,19 +44,27 @@ void yuv2rgb(__uint8_t* yuv) {
     }
 }
 
-int run_one_time(network *net, float thresh, float hier_thresh, image **alphabet, char **names, char *outfile) {
+int run_one_time(network *net, float thresh, float hier_thresh, image **alphabet, char **names) {
     struct dirent **namelist;
     int n;
 
     n = scandir("/tmp/webrtc", &namelist, 0, alphasort);
-    if (n <= 0) {
+    if (n <= 1) {
         printf("Could not open webrtc directory");
         return 0;
     }
 
-    char* latest = namelist[n-2]->d_name;
-    char path[100];
+    strncpy(latest, namelist[n-2]->d_name, sizeof(namelist[n-2]->d_name));
+    for (int i = 0; i < n; i++) {
+        free(namelist[i]);
+    }
+    free(namelist);
     sprintf(path, "/tmp/webrtc/%s", latest);
+    if (!strcmp(last_path, path)) {
+        return 0;
+    }
+    sprintf(outfile, "/tmp/detection/%s", latest);
+    strncpy(last_path, path, sizeof(path));
     printf("Open file: %s\n", path);
     FILE *ptr = fopen(path, "rb");
     if (ptr) {
@@ -58,6 +72,7 @@ int run_one_time(network *net, float thresh, float hier_thresh, image **alphabet
     } else {
         printf("Could not open file\n");
     }
+    fclose(ptr);
     yuv2rgb(yuv);
 
     image im = make_image(WIDTH, HEIGHT, CHANNEL);
@@ -69,7 +84,6 @@ int run_one_time(network *net, float thresh, float hier_thresh, image **alphabet
         }
     }
 
-    printf("123123\n");
     image sized = letterbox_image(im, net->w, net->h);
     layer l = net->layers[net->n-1];
     float *X = sized.data;
@@ -83,18 +97,15 @@ int run_one_time(network *net, float thresh, float hier_thresh, image **alphabet
     if (nms) do_nms_sort(dets, nboxes, l.classes, nms);
     draw_detections(im, dets, nboxes, thresh, names, alphabet, l.classes);
     free_detections(dets, nboxes);
-    if(outfile){
-        printf("write to: %s\n", outfile);
-        save_image(im, outfile);
-    } else {
-        printf("no output file specified\n");
-    }
+    printf("write to: %s\n", outfile);
+    save_image(im, outfile);
+    free(im.data);
+    free(sized.data);
     return 1;
 }
 
 int main(int argc, char **argv) {
     float thresh = find_float_arg(argc, argv, "-thresh", .5);
-    char *outfile = find_char_arg(argc, argv, "-out", 0);
 
     char *datacfg = "cfg/coco.data";
     char *cfgfile = argv[2];
@@ -108,6 +119,8 @@ int main(int argc, char **argv) {
     set_batch_network(net, 1);
     srand(2222222);
 
-    run_one_time(net, thresh, 0.5f, alphabet, names, outfile);
+    for (;;) {
+        run_one_time(net, thresh, 0.5f, alphabet, names);
+    }
     return 1;
 }
