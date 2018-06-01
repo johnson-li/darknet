@@ -50,7 +50,7 @@ int run_one_time(network *net, float thresh, float hier_thresh, image **alphabet
 
     n = scandir("/tmp/webrtc", &namelist, 0, alphasort);
     if (n <= 3) {
-        printf("Could not open webrtc directory");
+//        printf("Could not open webrtc directory");
         return 0;
     }
 
