@@ -32,3 +32,4 @@ cmake-build-debug/
 libdarknet.a
 libdarknet.so
 yolov3.weights
+original
