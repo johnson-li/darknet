@@ -29,7 +29,7 @@ void init_shared_memory() {
     if ((fd_shm = shm_open("/webrtc_frames", O_RDONLY, 0660)) == -1) {
         perror("shm_open");
     }
-    if ((frames = (struct shared_frames*) mmap(NULL, sizeof(struct shared_frames), PROT_READ | PROT_WRITE, MAP_SHARED, fd_shm, 0)) == MAP_FAILED) {
+    if ((frames = (struct shared_frames*) mmap(NULL, sizeof(struct shared_frames), PROT_READ, MAP_SHARED, fd_shm, 0)) == MAP_FAILED) {
         perror ("mmap");
     }
 }
